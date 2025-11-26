@@ -41,7 +41,7 @@ pip install -r requirements.txt
 ## Google Cloud Setup
 1. Set Active Project
 ```bash
-gcloud config set project deft-gearbox-410821
+gcloud config set project [YourProjectID]
 ```
 2. Authenticate User
 ```bash
