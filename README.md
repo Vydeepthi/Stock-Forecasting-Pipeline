@@ -15,23 +15,23 @@ All components have been tested end-to-end inside **Google Cloud Shell**.
 
 ##  Project Structure
 
-stock-forecasting-pipeline/
-│
-├── backfill_prices.py
-├── requirements.txt
-│
-└── services/
-    ├── extractor/
-    │   ├── main.py
-    │   ├── Dockerfile
-    │   ├── requirements.txt
+    stock-forecasting-pipeline/
     │
-    └── forecaster/
-        ├── main.py
-        ├── Dockerfile
-        ├── requirements.txt
-│
-└── cloudbuild-extractor.yaml
+    ├── backfill_prices.py
+    ├── requirements.txt
+    │
+    └── services/
+        ├── extractor/
+        │   ├── main.py
+        │   ├── Dockerfile
+        │   ├── requirements.txt
+        │
+        └── forecaster/
+            ├── main.py
+            ├── Dockerfile
+            ├── requirements.txt
+    │
+    └── cloudbuild-extractor.yaml
 
 ## Installation & Environment Setup
 Follow these steps to set up the environment locally or inside Google Cloud Shell.
