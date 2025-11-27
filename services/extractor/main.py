@@ -11,8 +11,11 @@ app = Flask(__name__)
 bq = bigquery.Client()
 
 # Hard-coded for now – matches your project + create_tables.sql
-PROJECT = "group5-stock-forecasting"
+import os
+
+PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "deft-gearbox-410821")
 DS = "market"
+
 
 T_H = f"{PROJECT}.{DS}.prices_hourly"
 OUT_S = f"{PROJECT}.{DS}.forecast_short"
