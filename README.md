@@ -3,7 +3,8 @@
 This project implements a complete **stock price forecasting pipeline** using:
 
 - **Yahoo Finance** for data ingestion  
-- **Google Cloud BigQuery** for scalable storage  
+- **Cloud Run + Cloud Scheduler** for automated extraction
+- **BigQuery** for storage
 - **SARIMA** for short-term (24-hour) forecasts  
 - **Prophet** for long-term (90-day) forecasts  
 - **Python scripts** for automation and computation  
@@ -14,16 +15,23 @@ All components have been tested end-to-end inside **Google Cloud Shell**.
 
 ##  Project Structure
 
-    stock-forecasting-pipeline/
+stock-forecasting-pipeline/
+│
+├── backfill_prices.py
+├── requirements.txt
+│
+└── services/
+    ├── extractor/
+    │   ├── main.py
+    │   ├── Dockerfile
+    │   ├── requirements.txt
     │
-    ├── backfill_prices.py
-    ├── requirements.txt
-    │
-    └── services/
-        └── forecaster/
-            ├── main.py
-            ├── Dockerfile
-   └── cloudbuild-extractor.yaml
+    └── forecaster/
+        ├── main.py
+        ├── Dockerfile
+        ├── requirements.txt
+│
+└── cloudbuild-extractor.yaml
 
 ## Installation & Environment Setup
 Follow these steps to set up the environment locally or inside Google Cloud Shell.
@@ -117,15 +125,97 @@ CREATE OR REPLACE TABLE `deft-gearbox-410821.market.eval_metrics` (
   ts TIMESTAMP
 );'
 ```
+## EXTRACTOR - AUTOMATED DATA INGESTION
+Runs every hour using Cloud Scheduler --> CLOUD Run
+**Build&Deploy Extractor to Cloud Run**
+```bash
+cd ~/stock-forecasting-pipeline
+gcloud builds submit --config=cloudbuild-extractor.yaml .
+```
+**Then Deploy**
+```bash
+gcloud run deploy extractor-service \
+  --region=us-central1 \
+  --source=services/extractor \
+  --allow-unauthenticated
+```
+**Copy Cloud Run URL(looks like):**
+https://extractor-service-XXXX-uc.a.run.app
 
-## Running the Pipeline
-**Backfill Yahoo Finance Data**
-Loads historical stock data into BigQuery:
+## SCHEDULING THE EXTRACTOR
+**Create Cloud Scheduler Job:**
+```bash
+gcloud scheduler jobs create http extractor-hourly \
+  --schedule="0 * * * *" \
+  --time-zone="Asia/Kolkata" \
+  --uri="YOUR_EXTRACTOR_URL" \
+  --http-method=GET \
+  --location=us-central1
+```
+**Check logs**
+```bash
+gcloud run services logs read extractor-service --region=us-central1
+```
+
+## FORECATER - SHORT-TERM(SARIMA) & LONG-TERM(PROPHET)
+**Run locally inside Cloud Shell:**
+```bash
+cd ~/stock-forecasting-pipeline
+export PROJECT_ID=deft-gearbox-410821
+export GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+
+python services/forecaster/main.py
+```
+**Output Produced in BigQuery:**
+market.forecast_short --> 24-hour SARIMA forecast
+market.forecast_lond --> 90-day Prophet forecast
+market.eval_metrics --> model performance metrics
+
+## BACKFILL
+**To load all hostorical prices**
 ```bash
 python backfill_prices.py
 ```
-**RUN the Forecaster**
+This prepares **10 years of daily data** for Prophet + hourly data for Sarima
+
+## How to Run Full Pipeline from scratch
+
 ```bash
+cd ~/stock-forecasting-pipeline
+gcloud auth login
+gcloud config set project deft-gearbox-410821
+
+# Create dataset/tables
+bq --location=US mk -d market
+# (run the CREATE TABLE commands above)
+
+# Run backfill
+python backfill_prices.py
+
+# Deploy extractor
+gcloud builds submit --config=cloudbuild-extractor.yaml .
+gcloud run deploy extractor-service --region=us-central1 --source=services/extractor --allow-unauthenticated
+
+# Create hourly scheduler
+gcloud scheduler jobs create http extractor-hourly \
+  --schedule="0 * * * *" \
+  --time-zone="Asia/Kolkata" \
+  --uri="EXTRACTOR_URL" \
+  --http-method=GET \
+  --location=us-central1
+
+# Run forecasting
 python services/forecaster/main.py
 ```
 
+
+## Deployment
+**Forecaster as Cloud Run Service**
+```bash
+gcloud run deploy forecaster-service \
+  --region=us-central1 \
+  --source=services/forecaster \
+  --allow-unauthenticated
+```
+
+Then schedule daily forecast jobs with Cloud Scheduler.
